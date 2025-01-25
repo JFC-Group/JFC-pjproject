@@ -173,15 +173,15 @@ static void init_outbound_setting(pjsua_acc *acc)
         const pj_str_t *hostname;
         pj_uint32_t hval;
         pj_size_t pos;
-        char instprm[] = ";+sip.instance=\"<urn:uuid:00000000-0000-0000-0000-0000CCDDEEFF>\"";
+        char instprm[] = ";+sip.instance=\"<00000000-0000-0000-0000-0000CCDDEEFF>\"";
 
         hostname = pj_gethostname();
         pos = pj_ansi_strlen(instprm) - 10;
         hval = pj_hash_calc(0, hostname->ptr, (unsigned)hostname->slen);
-        pj_val_to_hex_digit(((char*)&hval)[0], instprm + pos + 0);
-        pj_val_to_hex_digit(((char*)&hval)[1], instprm + pos + 2);
-        pj_val_to_hex_digit(((char*)&hval)[2], instprm + pos + 4);
-        pj_val_to_hex_digit(((char*)&hval)[3], instprm + pos + 6);
+        pj_val_to_hex_digit_capital(((char*)&hval)[0], instprm + pos + 0);
+        pj_val_to_hex_digit_capital(((char*)&hval)[1], instprm + pos + 2);
+        pj_val_to_hex_digit_capital(((char*)&hval)[2], instprm + pos + 4);
+        pj_val_to_hex_digit_capital(((char*)&hval)[3], instprm + pos + 6);
 
         pj_strdup2(acc->pool, &acc->rfc5626_instprm, instprm);
     } else {
