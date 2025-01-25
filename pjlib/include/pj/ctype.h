@@ -140,6 +140,12 @@ PJ_INLINE(int) pj_isxdigit(unsigned char c){ return isxdigit(c); }
 #define pj_hex_digits   "0123456789abcdef"
 
 /**
+ * Array of hex digits, in upperspace.
+ */
+ /*extern char pj_hex_digits_capital[];*/
+#define pj_hex_digits_capital "0123456789ABCDEF"
+
+/**
  * Convert a value to hex representation.
  * @param value     Integral value to convert.
  * @param p         Buffer to hold the hex representation, which must be
@@ -149,6 +155,18 @@ PJ_INLINE(void) pj_val_to_hex_digit(unsigned value, char *p)
 {
     *p++ = pj_hex_digits[ (value & 0xF0) >> 4 ];
     *p   = pj_hex_digits[ (value & 0x0F) ];
+}
+
+/**
+ * Convert a value to hex representation.
+ * @param value     Integral value to convert.
+ * @param p         Buffer to hold the hex representation, which must be
+ *                  at least two bytes length.
+ */
+PJ_INLINE(void) pj_val_to_hex_digit_capital(unsigned value, char* p)
+{
+    *p++ = pj_hex_digits_capital[(value & 0xF0) >> 4];
+    *p = pj_hex_digits_capital[(value & 0x0F)];
 }
 
 /**
