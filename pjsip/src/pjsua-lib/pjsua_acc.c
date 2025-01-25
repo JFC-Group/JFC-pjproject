@@ -3835,6 +3835,18 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uac_contact( pj_pool_t *pool,
         transport_param[0] = '\0';
     }
 
+    if (acc->cfg.use_rfc5626) {
+        pj_ssize_t new_len;
+        pj_str_t new_prm;
+
+        new_len = acc->cfg.contact_params.slen + acc->rfc5626_instprm.slen;
+
+        new_prm.ptr = (char*)pj_pool_alloc(acc->pool, new_len);
+
+        pj_strcpy(&new_prm, &(acc->cfg.contact_params));
+        pj_strcat(&new_prm, &(acc->rfc5626_instprm));
+        acc->cfg.contact_params = new_prm;
+    }
 
     /* Create the contact header */
     contact->ptr = (char*)pj_pool_alloc(pool, PJSIP_MAX_URL_SIZE);
