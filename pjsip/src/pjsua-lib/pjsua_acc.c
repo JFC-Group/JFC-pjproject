@@ -229,6 +229,18 @@ static pj_uint32_t calc_proxy_crc(const pj_str_t proxy[], pj_size_t cnt)
 }
 
 /*
+ * The +sip.instance Contact param that the JF router requires in every
+ * Contact header, or an empty string when SIP outbound is disabled.
+ * It is appended when a Contact is built instead of being merged into
+ * acc->cfg.contact_params, so the param appears exactly once.
+ */
+static pj_str_t acc_contact_instprm(const pjsua_acc *acc)
+{
+    pj_str_t empty = { NULL, 0 };
+    return acc->cfg.use_rfc5626 ? acc->rfc5626_instprm : empty;
+}
+
+/*
  * Initialize outbound settings.
  */
 static void init_outbound_setting(pjsua_acc *acc)
@@ -1816,9 +1828,12 @@ done:
         pj_ssize_t len;
         pj_str_t reg_contact;
 
+        pj_str_t instprm = acc_contact_instprm(acc);
+
         acc->rfc5626_status = OUTBOUND_WANTED;
         len = acc->contact.slen +
               acc->cfg.contact_params.slen +
+              instprm.slen +
               acc->cfg.reg_contact_params.slen +
               acc->cfg.reg_contact_uri_params.slen +
               (need_outbound? acc->rfc5626_regprm.slen: 0) +
@@ -1857,11 +1872,12 @@ done:
                 /* Regenerate Contact */
                 reg_contact.slen = pj_ansi_snprintf(
                                             reg_contact.ptr, len,
-                                            "<%.*s%.*s>%.*s",
+                                            "<%.*s%.*s>%.*s%.*s",
                                             (int)tmp_len, tmp_uri,
                                             (int)uri_param.slen, uri_param.ptr,
                                             (int)acc->cfg.contact_params.slen,
-                                            acc->cfg.contact_params.ptr);
+                                            acc->cfg.contact_params.ptr,
+                                            (int)instprm.slen, instprm.ptr);
                 pj_assert(reg_contact.slen > 0);
             }
 
@@ -2148,6 +2164,7 @@ static pj_bool_t acc_check_nat_addr(pjsua_acc *acc,
         char transport_param[32];
         int len;
         pj_bool_t secure;
+        pj_str_t instprm = acc_contact_instprm(acc);
 
         secure = pjsip_transport_get_flag_from_type(tp->key.type) &
                  PJSIP_TRANSPORT_SECURE;
@@ -2174,7 +2191,7 @@ static pj_bool_t acc_check_nat_addr(pjsua_acc *acc,
 
         tmp = (char*) pj_pool_alloc(pool, PJSIP_MAX_URL_SIZE);
         len = pj_ansi_snprintf(tmp, PJSIP_MAX_URL_SIZE,
-                               "<%s:%.*s%s%s%.*s%s:%d%s%.*s%s>%.*s",
+                               "<%s:%.*s%s%s%.*s%s:%d%s%.*s%s>%.*s%.*s",
                                ((secure && acc->is_sips)? "sips" : "sip"),
                                (int)acc->user_part.slen,
                                acc->user_part.ptr,
@@ -2189,7 +2206,8 @@ static pj_bool_t acc_check_nat_addr(pjsua_acc *acc,
                                acc->cfg.contact_uri_params.ptr,
                                (acc->cfg.use_rfc5626? ob: ""),
                                (int)acc->cfg.contact_params.slen,
-                               acc->cfg.contact_params.ptr);
+                               acc->cfg.contact_params.ptr,
+                               (int)instprm.slen, instprm.ptr);
         if (len < 1 || len >= PJSIP_MAX_URL_SIZE) {
             PJ_LOG(1,(THIS_FILE, "URI too long"));
             pj_pool_release(pool);
@@ -4073,10 +4091,12 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uac_contact( pj_pool_t *pool,
     const char *beginquote, *endquote;
     char transport_param[32];
     const char *ob = ";ob";
+    pj_str_t instprm;
 
-    
+
     PJ_ASSERT_RETURN(pjsua_acc_is_valid(acc_id), PJ_EINVAL);
     acc = &pjsua_var.acc[acc_id];
+    instprm = acc_contact_instprm(acc);
 
     /* If force_contact is configured, then use use it */
     if (acc->cfg.force_contact.slen) {
@@ -4106,23 +4126,10 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uac_contact( pj_pool_t *pool,
         transport_param[0] = '\0';
     }
 
-    if (acc->cfg.use_rfc5626) {
-        pj_ssize_t new_len;
-        pj_str_t new_prm;
-
-        new_len = acc->cfg.contact_params.slen + acc->rfc5626_instprm.slen;
-
-        new_prm.ptr = (char*)pj_pool_alloc(acc->pool, new_len);
-
-        pj_strcpy(&new_prm, &(acc->cfg.contact_params));
-        pj_strcat(&new_prm, &(acc->rfc5626_instprm));
-        acc->cfg.contact_params = new_prm;
-    }
-
     /* Create the contact header */
     contact->ptr = (char*)pj_pool_alloc(pool, PJSIP_MAX_URL_SIZE);
     contact->slen = pj_ansi_snprintf(contact->ptr, PJSIP_MAX_URL_SIZE,
-                                     "%s%.*s%s<%s:%.*s%s%s%.*s%s:%d%s%.*s%s>%.*s",
+                                     "%s%.*s%s<%s:%.*s%s%s%.*s%s:%d%s%.*s%s>%.*s%.*s",
                                      (acc->display.slen?"\"" : ""),
                                      (int)acc->display.slen,
                                      acc->display.ptr,
@@ -4141,7 +4148,8 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uac_contact( pj_pool_t *pool,
                                      acc->cfg.contact_uri_params.ptr,
                                      (acc->cfg.use_rfc5626? ob: ""),
                                      (int)acc->cfg.contact_params.slen,
-                                     acc->cfg.contact_params.ptr);
+                                     acc->cfg.contact_params.ptr,
+                                     (int)instprm.slen, instprm.ptr);
     if (contact->slen < 1 || contact->slen >= (int)PJSIP_MAX_URL_SIZE)
         return PJ_ETOOSMALL;
     return PJ_SUCCESS;
@@ -4175,9 +4183,11 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uas_contact( pj_pool_t *pool,
     int local_port;
     const char *beginquote, *endquote;
     char transport_param[32];
-    
+    pj_str_t instprm;
+
     PJ_ASSERT_RETURN(pjsua_acc_is_valid(acc_id), PJ_EINVAL);
     acc = &pjsua_var.acc[acc_id];
+    instprm = acc_contact_instprm(acc);
 
     /* If force_contact is configured, then use use it */
     if (acc->cfg.force_contact.slen) {
@@ -4335,7 +4345,7 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uas_contact( pj_pool_t *pool,
     /* Create the contact header */
     contact->ptr = (char*) pj_pool_alloc(pool, PJSIP_MAX_URL_SIZE);
     contact->slen = pj_ansi_snprintf(contact->ptr, PJSIP_MAX_URL_SIZE,
-                                     "%s%.*s%s<%s:%.*s%s%s%.*s%s:%d%s%.*s>%.*s",
+                                     "%s%.*s%s<%s:%.*s%s%s%.*s%s:%d%s%.*s>%.*s%.*s",
                                      (acc->display.slen?"\"" : ""),
                                      (int)acc->display.slen,
                                      acc->display.ptr,
@@ -4353,7 +4363,8 @@ PJ_DEF(pj_status_t) pjsua_acc_create_uas_contact( pj_pool_t *pool,
                                      (int)acc->cfg.contact_uri_params.slen,
                                      acc->cfg.contact_uri_params.ptr,
                                      (int)acc->cfg.contact_params.slen,
-                                     acc->cfg.contact_params.ptr);
+                                     acc->cfg.contact_params.ptr,
+                                     (int)instprm.slen, instprm.ptr);
     if (contact->slen < 1 || contact->slen >= (int)PJSIP_MAX_URL_SIZE)
         return PJ_ETOOSMALL;
 
