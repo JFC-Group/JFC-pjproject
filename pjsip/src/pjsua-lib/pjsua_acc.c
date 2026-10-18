@@ -238,7 +238,7 @@ static void init_outbound_setting(pjsua_acc *acc)
         const pj_str_t *hostname;
         pj_uint32_t hval;
         pj_size_t pos;
-        char instprm[] = ";+sip.instance=\"<00000000-0000-0000-0000-0000CCDDEEFF>\"";
+        char instprm[] = ";+sip.instance=\"<00000000-0000-1000-8000-0000CCDDEEFF>\"";
 
         hostname = pj_gethostname();
         pos = pj_ansi_strlen(instprm) - 10;
