@@ -718,12 +718,17 @@ static pj_status_t apply_call_setting(pjsua_call *call,
     }
 
     /* If call is established or media channel hasn't been initialized,
-     * reinit media channel.
+     * reinit media channel. Also for an offer received in an early dialog
+     * (e.g. an UPDATE before the call is answered): without it, media that
+     * the early answer rejected (and whose transport was closed) can't be
+     * re-enabled, and the answer rejects it again. Some IMS networks answer
+     * a video call with video rejected first and offer it in an UPDATE.
      */
     if (call->inv &&
         ((call->inv->state == PJSIP_INV_STATE_CONNECTING &&
           call->med_cnt == 0) ||
          (call->inv->state == PJSIP_INV_STATE_CONFIRMED) ||
+         (rem_sdp && call->inv->state == PJSIP_INV_STATE_EARLY) ||
          (call->opt.flag & PJSUA_CALL_REINIT_MEDIA)))
     {
         pjsip_role_e role = rem_sdp? PJSIP_ROLE_UAS : PJSIP_ROLE_UAC;
